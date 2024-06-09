@@ -55,7 +55,7 @@ class DepthNet(nn.Module):
     def forward(self, x, mats_dict, lidar_depth, scale_depth_factor=1000.0):
         x = self.reduce_conv(x)
         context = self.context_conv(x)
-        inv_intrinsics = torch.inverse(mats_dict['intrin_mats'][:, 0:1, ...])
+        inv_intrinsics = torch.inverse(mats_dict['intrin_mats'][:, 0:1, ...].cpu()).cuda()
         pixel_size = torch.norm(torch.stack(
             [inv_intrinsics[..., 0, 0], inv_intrinsics[..., 1, 1]], dim=-1),
                                 dim=-1).reshape(-1, 1)
