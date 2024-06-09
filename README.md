@@ -25,9 +25,21 @@ BEVStereo is a new multi-view 3D object detector using temporal stereo to enhanc
 
 ## Quick Start
 ### Installation
-**Step 0.** Install [pytorch](https://pytorch.org/)(v1.9.0).
+**Step 0.** Install [pytorch](https://pytorch.org/)(v1.9.0).  ---mmcv>=1.5.2, <=1.7.0 
+```shell
+pip install torch==1.9.0+cu111 torchvision==0.10.0+cu111 torchaudio==0.9.0 -f https://download.pytorch.org/whl/torch_stable.html
+
+pip install mmcv-full==1.5.2 mmdet==2.25.1 mmsegmentation==0.27.0
+```
+
 
 **Step 1.** Install [MMDetection3D](https://github.com/open-mmlab/mmdetection3d)(v1.0.0rc4).
+```shell
+git clone https://github.com/open-mmlab/mmdetection3d.git
+cd mmdetection3d
+git checkout v1.0.0rc4
+pip install -v -e . 
+```
 
 **Step 2.** Install requirements.
 ```shell
@@ -65,6 +77,7 @@ python scripts/gen_info.py
 **Train.**
 ```
 python [EXP_PATH] --amp_backend native -b 8 --gpus 8
+python bevdepth/exps/nuscenes/fusion/bev_depth_fusion_lss_r50_256x704_128x128_24e.py --amp_backend native -b 1 --gpus 1
 ```
 **Eval.**
 ```
