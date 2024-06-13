@@ -1,5 +1,6 @@
 # Copyright (c) Megvii Inc. All rights reserved.
 import os
+import pdb
 from argparse import ArgumentParser
 
 import pytorch_lightning as pl
@@ -46,7 +47,7 @@ def run_cli(model_class=BEVDepthLightningModel,
     args = parser.parse_args()
     if args.seed is not None:
         pl.seed_everything(args.seed)
-
+    # pdb.set_trace()
     model = model_class(**vars(args))
     if use_ema:
         train_dataloader = model.train_dataloader()
@@ -55,6 +56,7 @@ def run_cli(model_class=BEVDepthLightningModel,
         trainer = pl.Trainer.from_argparse_args(args, callbacks=[ema_callback])
     else:
         trainer = pl.Trainer.from_argparse_args(args)
+
     if args.evaluate:
         trainer.test(model, ckpt_path=args.ckpt_path)
     elif args.predict:

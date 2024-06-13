@@ -23,12 +23,7 @@ class BaseBEVDepth(nn.Module):
         self.head = BEVDepthHead(**head_conf)
         self.is_train_depth = is_train_depth
 
-    def forward(
-        self,
-        x,
-        mats_dict,
-        timestamps=None,
-    ):
+    def forward(self, x, mats_dict, timestamps=None, ):
         """Forward function for BEVDepth
 
         Args:
@@ -53,10 +48,7 @@ class BaseBEVDepth(nn.Module):
             tuple(list[dict]): Output results for tasks.
         """
         if self.is_train_depth and self.training:
-            x, depth_pred = self.backbone(x,
-                                          mats_dict,
-                                          timestamps,
-                                          is_return_depth=True)
+            x, depth_pred = self.backbone(x, mats_dict, timestamps, is_return_depth=True)
             preds = self.head(x)
             return preds, depth_pred
         else:

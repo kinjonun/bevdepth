@@ -1,5 +1,6 @@
 # Copyright (c) Megvii Inc. All rights reserved.
 import torch
+import pdb
 import torch.nn.functional as F
 from mmcv.cnn import build_conv_layer
 from mmdet3d.models import build_neck
@@ -167,8 +168,7 @@ class SELayer(nn.Module):
 
 class DepthNet(nn.Module):
 
-    def __init__(self, in_channels, mid_channels, context_channels,
-                 depth_channels):
+    def __init__(self, in_channels, mid_channels, context_channels, depth_channels):
         super(DepthNet, self).__init__()
         self.reduce_conv = nn.Sequential(
             nn.Conv2d(in_channels,
@@ -216,8 +216,7 @@ class DepthNet(nn.Module):
         num_cams = intrins.shape[2]
         ida = mats_dict['ida_mats'][:, 0:1, ...]
         sensor2ego = mats_dict['sensor2ego_mats'][:, 0:1, ..., :3, :]
-        bda = mats_dict['bda_mat'].view(batch_size, 1, 1, 4,
-                                        4).repeat(1, 1, num_cams, 1, 1)
+        bda = mats_dict['bda_mat'].view(batch_size, 1, 1, 4, 4).repeat(1, 1, num_cams, 1, 1)
         mlp_input = torch.cat(
             [
                 torch.stack(
@@ -385,8 +384,7 @@ class BaseLSSFPN(nn.Module):
 
     def _configure_depth_aggregation_net(self):
         """build pixel cloud feature extractor"""
-        return DepthAggregation(self.output_channels, self.output_channels,
-                                self.output_channels)
+        return DepthAggregation(self.output_channels, self.output_channels, self.output_channels)
 
     def _forward_voxel_net(self, img_feat_with_depth):
         if self.use_da:
@@ -502,31 +500,24 @@ class BaseLSSFPN(nn.Module):
         Returns:
             Tensor: BEV feature map.
         """
-        batch_size, num_sweeps, num_cams, num_channels, img_height, \
-            img_width = sweep_imgs.shape
+        batch_size, num_sweeps, num_cams, num_channels, img_height, img_width = sweep_imgs.shape
         img_feats = self.get_cam_feats(sweep_imgs)
         source_features = img_feats[:, 0, ...]
         depth_feature = self._forward_depth_net(
-            source_features.reshape(batch_size * num_cams,
-                                    source_features.shape[2],
-                                    source_features.shape[3],
-                                    source_features.shape[4]),
+            source_features.reshape(batch_size * num_cams, source_features.shape[2], source_features.shape[3], source_features.shape[4]),
             mats_dict,
         )
-        depth = depth_feature[:, :self.depth_channels].softmax(
-            dim=1, dtype=depth_feature.dtype)
+        depth = depth_feature[:, :self.depth_channels].softmax(dim=1, dtype=depth_feature.dtype)
         geom_xyz = self.get_geometry(
             mats_dict['sensor2ego_mats'][:, sweep_index, ...],
             mats_dict['intrin_mats'][:, sweep_index, ...],
             mats_dict['ida_mats'][:, sweep_index, ...],
             mats_dict.get('bda_mat', None),
         )
-        geom_xyz = ((geom_xyz - (self.voxel_coord - self.voxel_size / 2.0)) /
-                    self.voxel_size).int()
+        geom_xyz = ((geom_xyz - (self.voxel_coord - self.voxel_size / 2.0)) / self.voxel_size).int()
         if self.training or self.use_da:
             img_feat_with_depth = depth.unsqueeze(
-                1) * depth_feature[:, self.depth_channels:(
-                    self.depth_channels + self.output_channels)].unsqueeze(2)
+                1) * depth_feature[:, self.depth_channels:( self.depth_channels + self.output_channels)].unsqueeze(2)
 
             img_feat_with_depth = self._forward_voxel_net(img_feat_with_depth)
 
@@ -541,19 +532,15 @@ class BaseLSSFPN(nn.Module):
 
             img_feat_with_depth = img_feat_with_depth.permute(0, 1, 3, 4, 5, 2)
 
-            feature_map = voxel_pooling_train(geom_xyz,
-                                              img_feat_with_depth.contiguous(),
-                                              self.voxel_num.cuda())
+            feature_map = voxel_pooling_train(geom_xyz, img_feat_with_depth.contiguous(), self.voxel_num.cuda())
         else:
             feature_map = voxel_pooling_inference(
-                geom_xyz, depth, depth_feature[:, self.depth_channels:(
-                    self.depth_channels + self.output_channels)].contiguous(),
+                geom_xyz, depth, depth_feature[:, self.depth_channels:(self.depth_channels + self.output_channels)].contiguous(),
                 self.voxel_num.cuda())
+
         if is_return_depth:
-            # final_depth has to be fp32, otherwise the depth
-            # loss will colapse during the traing process.
-            return feature_map.contiguous(
-            ), depth_feature[:, :self.depth_channels].softmax(dim=1)
+            # final_depth has to be fp32, otherwise the depth loss will colapse during the traing process.
+            return feature_map.contiguous(), depth_feature[:, :self.depth_channels].softmax(dim=1)
         return feature_map.contiguous()
 
     def forward(self,
@@ -585,19 +572,13 @@ class BaseLSSFPN(nn.Module):
         Return:
             Tensor: bev feature map.
         """
-        batch_size, num_sweeps, num_cams, num_channels, img_height, \
-            img_width = sweep_imgs.shape
-
-        key_frame_res = self._forward_single_sweep(
-            0,
-            sweep_imgs[:, 0:1, ...],
-            mats_dict,
-            is_return_depth=is_return_depth)
+        batch_size, num_sweeps, num_cams, num_channels, img_height, img_width = sweep_imgs.shape  # [1, 2, 6, 3,256,704]
+        # pdb.set_trace()
+        key_frame_res = self._forward_single_sweep(0, sweep_imgs[:, 0:1, ...], mats_dict, is_return_depth=is_return_depth)
         if num_sweeps == 1:
             return key_frame_res
 
-        key_frame_feature = key_frame_res[
-            0] if is_return_depth else key_frame_res
+        key_frame_feature = key_frame_res[0] if is_return_depth else key_frame_res
 
         ret_feature_list = [key_frame_feature]
         for sweep_index in range(1, num_sweeps):

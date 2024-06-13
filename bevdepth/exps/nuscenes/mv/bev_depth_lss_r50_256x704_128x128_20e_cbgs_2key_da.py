@@ -36,16 +36,11 @@ class BEVDepthLightningModel(BaseBEVDepthLightningModel):
         super().__init__(**kwargs)
         self.backbone_conf['use_da'] = True
         self.data_use_cbgs = True
-        self.model = BaseBEVDepth(self.backbone_conf,
-                                  self.head_conf,
-                                  is_train_depth=True)
+        self.model = BaseBEVDepth(self.backbone_conf, self.head_conf, is_train_depth=True)
 
     def configure_optimizers(self):
-        lr = self.basic_lr_per_img * \
-            self.batch_size_per_device * self.gpus
-        optimizer = torch.optim.AdamW(self.model.parameters(),
-                                      lr=lr,
-                                      weight_decay=1e-7)
+        lr = self.basic_lr_per_img * self.batch_size_per_device * self.gpus
+        optimizer = torch.optim.AdamW(self.model.parameters(), lr=lr, weight_decay=1e-7)
         scheduler = MultiStepLR(optimizer, [16, 19])
         return [[optimizer], [scheduler]]
 

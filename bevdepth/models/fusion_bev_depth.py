@@ -1,3 +1,4 @@
+import pdb
 from bevdepth.layers.backbones.fusion_lss_fpn import FusionLSSFPN
 from bevdepth.layers.heads.bev_depth_head import BEVDepthHead
 
@@ -23,13 +24,7 @@ class FusionBEVDepth(BaseBEVDepth):
         self.head = BEVDepthHead(**head_conf)
         self.is_train_depth = is_train_depth
 
-    def forward(
-        self,
-        x,
-        mats_dict,
-        lidar_depth,
-        timestamps=None,
-    ):
+    def forward(self, x, mats_dict, lidar_depth, timestamps=None):
         """Forward function for BEVDepth
 
         Args:
@@ -56,9 +51,11 @@ class FusionBEVDepth(BaseBEVDepth):
         """
         if self.is_train_depth and self.training:
             x = self.backbone(x, mats_dict, lidar_depth, timestamps)
+            # pdb.set_trace()
             preds = self.head(x)
             return preds
         else:
-            x = self.backbone(x, mats_dict, lidar_depth, timestamps)
+            x = self.backbone(x, mats_dict, lidar_depth, timestamps)          # [1, 80, 128, 128]
+            # pdb.set_trace()
             preds = self.head(x)
             return preds

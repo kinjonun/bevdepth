@@ -1,5 +1,6 @@
 # Copyright (c) Megvii Inc. All rights reserved.
 import os
+import pdb
 from functools import partial
 
 import mmcv
@@ -21,21 +22,16 @@ from bevdepth.utils.torch_dist import all_gather_object, get_rank, synchronize
 H = 900
 W = 1600
 final_dim = (256, 704)
-img_conf = dict(img_mean=[123.675, 116.28, 103.53],
-                img_std=[58.395, 57.12, 57.375],
-                to_rgb=True)
+img_conf = dict(img_mean=[123.675, 116.28, 103.53], img_std=[58.395, 57.12, 57.375], to_rgb=True)
 
 backbone_conf = {
     'x_bound': [-51.2, 51.2, 0.8],
     'y_bound': [-51.2, 51.2, 0.8],
     'z_bound': [-5, 3, 8],
     'd_bound': [2.0, 58.0, 0.5],
-    'final_dim':
-    final_dim,
-    'output_channels':
-    80,
-    'downsample_factor':
-    16,
+    'final_dim': final_dim,
+    'output_channels': 80,
+    'downsample_factor': 16,
     'img_backbone_conf':
     dict(
         type='ResNet',
@@ -57,22 +53,16 @@ backbone_conf = {
 }
 ida_aug_conf = {
     'resize_lim': (0.386, 0.55),
-    'final_dim':
-    final_dim,
+    'final_dim': final_dim,
     'rot_lim': (-5.4, 5.4),
-    'H':
-    H,
-    'W':
-    W,
-    'rand_flip':
-    True,
+    'H': H,
+    'W': W,
+    'rand_flip': True,
     'bot_pct_lim': (0.0, 0.0),
     'cams': [
-        'CAM_FRONT_LEFT', 'CAM_FRONT', 'CAM_FRONT_RIGHT', 'CAM_BACK_LEFT',
-        'CAM_BACK', 'CAM_BACK_RIGHT'
+        'CAM_FRONT_LEFT', 'CAM_FRONT', 'CAM_FRONT_RIGHT', 'CAM_BACK_LEFT', 'CAM_BACK', 'CAM_BACK_RIGHT'
     ],
-    'Ncams':
-    6,
+    'Ncams': 6,
 }
 
 bda_aug_conf = {
@@ -211,11 +201,8 @@ class BEVDepthLightningModel(LightningModule):
         self.bda_aug_conf = bda_aug_conf
         mmcv.mkdir_or_exist(default_root_dir)
         self.default_root_dir = default_root_dir
-        self.evaluator = DetNuscEvaluator(class_names=self.class_names,
-                                          output_dir=self.default_root_dir)
-        self.model = BaseBEVDepth(self.backbone_conf,
-                                  self.head_conf,
-                                  is_train_depth=True)
+        self.evaluator = DetNuscEvaluator(class_names=self.class_names, output_dir=self.default_root_dir)
+        self.model = BaseBEVDepth(self.backbone_conf, self.head_conf, is_train_depth=True)
         self.mode = 'valid'
         self.img_conf = img_conf
         self.data_use_cbgs = False
@@ -225,28 +212,26 @@ class BEVDepthLightningModel(LightningModule):
         self.data_return_depth = True
         self.downsample_factor = self.backbone_conf['downsample_factor']
         self.dbound = self.backbone_conf['d_bound']
-        self.depth_channels = int(
-            (self.dbound[1] - self.dbound[0]) / self.dbound[2])
+        self.depth_channels = int((self.dbound[1] - self.dbound[0]) / self.dbound[2])
         self.use_fusion = False
-        self.train_info_paths = os.path.join(self.data_root,
-                                             'nuscenes_infos_train.pkl')
-        self.val_info_paths = os.path.join(self.data_root,
-                                           'nuscenes_infos_val.pkl')
-        self.predict_info_paths = os.path.join(self.data_root,
-                                               'nuscenes_infos_test.pkl')
+        self.train_info_paths = os.path.join(self.data_root, 'nuscenes_infos_train.pkl')
+        self.val_info_paths = os.path.join(self.data_root, 'nuscenes_infos_val.pkl')
+        self.predict_info_paths = os.path.join(self.data_root, 'nuscenes_infos_test.pkl')
 
     def forward(self, sweep_imgs, mats):
         return self.model(sweep_imgs, mats)
 
     def training_step(self, batch):
         (sweep_imgs, mats, _, _, gt_boxes, gt_labels, depth_labels) = batch
+        # pdb.set_trace()
         if torch.cuda.is_available():
             for key, value in mats.items():
                 mats[key] = value.cuda()
             sweep_imgs = sweep_imgs.cuda()
             gt_boxes = [gt_box.cuda() for gt_box in gt_boxes]
             gt_labels = [gt_label.cuda() for gt_label in gt_labels]
-        preds, depth_preds = self(sweep_imgs, mats)
+        preds, depth_preds = self(sweep_imgs, mats)      # 调用self.forward()     ‘__call__’
+
         if isinstance(self.model, torch.nn.parallel.DistributedDataParallel):
             targets = self.model.module.get_targets(gt_boxes, gt_labels)
             detection_loss = self.model.module.loss(targets, preds)
@@ -264,8 +249,7 @@ class BEVDepthLightningModel(LightningModule):
 
     def get_depth_loss(self, depth_labels, depth_preds):
         depth_labels = self.get_downsampled_gt_depth(depth_labels)
-        depth_preds = depth_preds.permute(0, 2, 3, 1).contiguous().view(
-            -1, self.depth_channels)
+        depth_preds = depth_preds.permute(0, 2, 3, 1).contiguous().view(-1, self.depth_channels)
         fg_mask = torch.max(depth_labels, dim=1).values > 0.0
 
         with autocast(enabled=False):
@@ -371,8 +355,7 @@ class BEVDepthLightningModel(LightningModule):
             self.evaluator.evaluate(all_pred_results, all_img_metas)
 
     def configure_optimizers(self):
-        lr = self.basic_lr_per_img * \
-            self.batch_size_per_device * self.gpus
+        lr = self.basic_lr_per_img * self.batch_size_per_device * self.gpus
         optimizer = torch.optim.AdamW(self.model.parameters(),
                                       lr=lr,
                                       weight_decay=1e-7)
@@ -397,12 +380,10 @@ class BEVDepthLightningModel(LightningModule):
         train_loader = torch.utils.data.DataLoader(
             train_dataset,
             batch_size=self.batch_size_per_device,
-            num_workers=4,
+            num_workers=0,
             drop_last=True,
             shuffle=False,
-            collate_fn=partial(collate_fn,
-                               is_return_depth=self.data_return_depth
-                               or self.use_fusion),
+            collate_fn=partial(collate_fn, is_return_depth=self.data_return_depth or self.use_fusion),
             sampler=None,
         )
         return train_loader
